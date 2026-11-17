@@ -5,10 +5,43 @@ import { Dashboard, type Expense, type Income } from "@/components/dashboard";
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
+// Datos de ejemplo para quien aún no ha iniciado sesión.
+function demoData(todayIso: string): { expenses: Expense[]; incomes: Income[] } {
+  const month = todayIso.slice(0, 7);
+  const today = Number(todayIso.slice(8, 10));
+  const day = (back: number) => `${month}-${String(Math.max(1, today - back)).padStart(2, "0")}`;
+
+  const expenses: Expense[] = [
+    { id: "d1", name: "Alquiler", amount: 550, recurring: true, possible: false, day: 1, spentOn: `${month}-01` },
+    { id: "d2", name: "Netflix", amount: 12.99, recurring: true, possible: false, day: 12, spentOn: `${month}-12` },
+    { id: "d3", name: "Gimnasio", amount: 29.9, recurring: true, possible: false, day: 20, spentOn: `${month}-20` },
+    { id: "d4", name: "Spotify", amount: 10.99, recurring: true, possible: false, day: 25, spentOn: `${month}-25` },
+    { id: "d5", name: "Corte de pelo", amount: 15, recurring: false, possible: false, day: 1, spentOn: day(1) },
+    { id: "d6", name: "Helado", amount: 3.5, recurring: false, possible: false, day: 1, spentOn: day(2) },
+    { id: "d7", name: "Compras ropa", amount: 49.9, recurring: false, possible: false, day: 1, spentOn: day(3) },
+    { id: "d8", name: "Camisa", amount: 39.9, recurring: false, possible: true, day: 1, spentOn: day(0) },
+    { id: "d9", name: "Zapatillas", amount: 89, recurring: false, possible: true, day: 1, spentOn: day(0) },
+  ];
+  const incomes: Income[] = [
+    { id: "i1", description: "Nómina", amount: 1850, currency: "EUR", rate: null, feePct: null, amountEur: 1850, receivedOn: `${month}-01` },
+    { id: "i2", description: "Freelance", amount: 220, currency: "USD", rate: 0.91, feePct: 0.5, amountEur: 199.2, receivedOn: day(2) },
+  ];
+  return { expenses, incomes };
+}
+
 export default async function Home() {
   const session = await auth();
-  const userId = session!.user.id;
+  const todayIso = iso(new Date());
 
+  if (!session?.user?.id) {
+    return (
+      <div className="w-full px-4 py-6 md:px-8 lg:px-12">
+        <Dashboard initial={demoData(todayIso)} todayIso={todayIso} userName="" demo />
+      </div>
+    );
+  }
+
+  const userId = session.user.id;
   const [expenseRows, incomeRows] = await Promise.all([
     sql`
       SELECT id, name, amount, charge_day, recurring, status, to_char(spent_on, 'YYYY-MM-DD') AS spent_on
@@ -46,8 +79,8 @@ export default async function Home() {
     <div className="w-full px-4 py-6 md:px-8 lg:px-12">
       <Dashboard
         initial={{ expenses, incomes }}
-        todayIso={iso(new Date())}
-        userName={session?.user?.name ?? session?.user?.email ?? ""}
+        todayIso={todayIso}
+        userName={session.user.name ?? session.user.email ?? ""}
       />
     </div>
   );

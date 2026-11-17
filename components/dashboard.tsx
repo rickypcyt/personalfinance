@@ -1,6 +1,7 @@
 "use client";
 
-import { useOptimistic, useTransition } from "react";
+import Link from "next/link";
+import { useOptimistic, useState, useTransition } from "react";
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, LogOut, Repeat, X } from "lucide-react";
 import {
   addFixedExpense,
@@ -85,13 +86,16 @@ export function Dashboard({
   initial,
   todayIso,
   userName,
+  demo = false,
 }: {
   initial: State;
   todayIso: string;
   userName: string;
+  demo?: boolean;
 }) {
   const [state, apply] = useOptimistic(initial, reduce);
   const [, startTransition] = useTransition();
+  const [showLogin, setShowLogin] = useState(false);
   const { expenses: all, incomes } = state;
 
   const today = fromIso(todayIso);
@@ -100,6 +104,10 @@ export function Dashboard({
 
   // Acciones con respuesta inmediata: se llaman dentro de una transición.
   async function addExpense(data: FormData) {
+    if (demo) {
+      setShowLogin(true);
+      return;
+    }
     const kind = data.get("kind");
     const date = String(data.get("date") ?? todayIso);
     apply({
@@ -119,6 +127,10 @@ export function Dashboard({
   }
 
   async function addIncome(data: FormData) {
+    if (demo) {
+      setShowLogin(true);
+      return { error: "Inicia sesión para guardar tus datos" };
+    }
     const currency = data.get("currency") === "USD" ? "USD" : "EUR";
     const amount = Number(data.get("amount"));
     const lastRate = incomes.find((i) => i.currency === "USD" && i.rate)?.rate ?? 0.9;
@@ -140,6 +152,10 @@ export function Dashboard({
   }
 
   function removeExpense(id: string) {
+    if (demo) {
+      setShowLogin(true);
+      return;
+    }
     startTransition(async () => {
       apply({ type: "removeExpense", id });
       const fd = new FormData();
@@ -149,6 +165,10 @@ export function Dashboard({
   }
 
   function removeIncome(id: string) {
+    if (demo) {
+      setShowLogin(true);
+      return;
+    }
     startTransition(async () => {
       apply({ type: "removeIncome", id });
       const fd = new FormData();
@@ -158,6 +178,10 @@ export function Dashboard({
   }
 
   function confirm(id: string) {
+    if (demo) {
+      setShowLogin(true);
+      return;
+    }
     startTransition(async () => {
       apply({ type: "confirm", id, today: todayIso, day: today.getDate() });
       const fd = new FormData();
@@ -194,14 +218,34 @@ export function Dashboard({
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="shrink-0">
           <p className="eyebrow">Finanzas personales</p>
-          <h1 className="text-2xl font-bold tracking-tight">Hola, {userName}</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {demo ? "Controla tu dinero en un vistazo" : `Hola, ${userName}`}
+          </h1>
         </div>
-        <form action={logout} className="shrink-0">
-          <button type="submit" className="btn-ghost">
-            <LogOut className="size-4" /> Salir
-          </button>
-        </form>
+        {demo ? (
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href="/login" className="btn-ghost">
+              Iniciar sesión
+            </Link>
+            <Link href="/register" className="btn !h-10 !px-5 !text-sm">
+              Crear cuenta
+            </Link>
+          </div>
+        ) : (
+          <form action={logout} className="shrink-0">
+            <button type="submit" className="btn-ghost">
+              <LogOut className="size-4" /> Salir
+            </button>
+          </form>
+        )}
       </header>
+
+      {demo && (
+        <p className="mb-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-dim">
+          Esto es una <span className="font-bold text-fg">demo con datos de ejemplo</span>. Inicia
+          sesión o crea una cuenta para guardar los tuyos.
+        </p>
+      )}
 
       {/* Resumen */}
       <section className="card mb-4 grid items-center gap-6 lg:grid-cols-2">
@@ -280,7 +324,7 @@ export function Dashboard({
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-bold">{i.description}</p>
               <div className="flex flex-wrap items-center gap-x-2">
-                <EditableDate id={i.id} value={i.receivedOn} kind="income" />
+                <EditableDate locked={demo} onLocked={() => setShowLogin(true)} id={i.id} value={i.receivedOn} kind="income" />
                 {i.currency === "USD" && i.rate !== null && (
                   <span className="text-xs text-dim">
                     ${i.amount.toFixed(2)} · {i.rate.toFixed(3)} · fee {i.feePct}%
@@ -301,7 +345,7 @@ export function Dashboard({
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-bold">{i.name}</p>
               <div className="flex flex-wrap items-center gap-x-2">
-                <EditableDate id={i.id} value={i.spentOn ?? iso(i.next.date)} kind="expense" />
+                <EditableDate locked={demo} onLocked={() => setShowLogin(true)} id={i.id} value={i.spentOn ?? iso(i.next.date)} kind="expense" />
                 <span className={i.next.days <= 3 ? "text-xs font-medium text-neg" : "text-xs text-dim"}>
                   Día {i.day} · {i.next.days === 0 ? "hoy" : `en ${i.next.days} d`}
                 </span>
@@ -319,7 +363,7 @@ export function Dashboard({
           <article key={i.id} className={`item ${i.pending ? "opacity-60" : ""}`}>
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-bold">{i.name}</p>
-              <EditableDate id={i.id} value={i.spentOn ?? iso(today)} kind="expense" />
+              <EditableDate locked={demo} onLocked={() => setShowLogin(true)} id={i.id} value={i.spentOn ?? iso(today)} kind="expense" />
             </div>
             <span className="text-lg font-bold">{eur.format(i.amount)}</span>
             <DeleteButton onClick={() => removeExpense(i.id)} />
@@ -346,6 +390,36 @@ export function Dashboard({
         ))}
       </Group>
       </div>
+      {showLogin && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          onClick={() => setShowLogin(false)}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="card w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-2xl font-bold tracking-tight">Inicia sesión para continuar</h2>
+            <p className="mt-2 text-sm text-dim">
+              Necesitas una cuenta para añadir, editar o borrar movimientos. Es gratis y tarda un
+              minuto.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <Link href="/login" className="btn">
+                Iniciar sesión
+              </Link>
+              <Link href="/register" className="btn-ghost">
+                Crear cuenta
+              </Link>
+              <button type="button" onClick={() => setShowLogin(false)} className="py-2 text-sm text-dim hover:text-fg">
+                Seguir mirando la demo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

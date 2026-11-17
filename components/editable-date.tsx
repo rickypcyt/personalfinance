@@ -7,10 +7,14 @@ export function EditableDate({
   id,
   value,
   kind,
+  locked,
+  onLocked,
 }: {
   id: string;
   value: string;
   kind: "expense" | "income";
+  locked?: boolean;
+  onLocked?: () => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -22,6 +26,15 @@ export function EditableDate({
       const res = await (kind === "income" ? updateIncomeDate : updateExpenseDate)(id, next);
       setError(res.error);
     });
+  }
+
+  if (locked) {
+    const [y, m, d] = value.split("-");
+    return (
+      <button type="button" onClick={onLocked} className="date-edit">
+        {d}/{m}/{y}
+      </button>
+    );
   }
 
   return (
