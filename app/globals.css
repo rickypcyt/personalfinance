@@ -1,26 +1,147 @@
 @import "tailwindcss";
 
+/*
+  Sistema de diseño propio.
+  - Negro puro de fondo, superficies grises muy oscuras (Apple).
+  - Tipografía grande y en negrita, botones en píldora (Uber).
+  - Bordes finos, radios generosos, sin sombras (shadcn).
+*/
+
+@theme {
+  --font-sans: Arial, Helvetica, sans-serif;
+
+  --color-bg: #000000;
+  --color-surface: #121212;
+  --color-surface-2: #1c1c1e;
+  --color-line: #2c2c2e;
+  --color-fg: #ffffff;
+  --color-dim: #8e8e93;
+  --color-pos: #30d158;
+  --color-neg: #ff453a;
+
+  --radius-card: 28px;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  font-size: 15px;
+  background: var(--color-bg);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer utilities {
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer components {
+  /* Superficie */
+  .card {
+    @apply rounded-[22px] border border-line bg-surface p-5;
+  }
+  .card-pos {
+    @apply border-pos/40 bg-pos/[0.06];
+  }
+  .card-neg {
+    @apply border-neg/40 bg-neg/[0.06];
+  }
+  .item {
+    @apply flex items-center gap-3 rounded-2xl border border-line bg-surface px-3.5 py-2.5 transition hover:border-dim/60;
+  }
+  .date-edit {
+    @apply -ml-1.5 w-fit cursor-pointer rounded-md bg-transparent px-1.5 py-0.5 text-xs text-dim outline-none transition hover:bg-surface-2 hover:text-fg focus:bg-surface-2 focus:text-fg disabled:opacity-50;
+    color-scheme: dark;
+  }
+  .eyebrow {
+    @apply text-xs font-medium uppercase tracking-wider text-dim;
+  }
+
+  /* Formularios */
+  .field {
+    @apply flex flex-col gap-2 text-sm font-medium text-dim;
+  }
+  .input {
+    @apply h-11 w-full rounded-xl border border-transparent bg-surface-2 px-3.5 text-base text-fg outline-none transition placeholder:text-dim/70 focus:border-fg;
+  }
+  .input[type="date"] {
+    color-scheme: dark;
+  }
+
+  /* Botones */
+  .btn {
+    @apply inline-flex h-11 items-center justify-center gap-2 rounded-full bg-fg px-6 text-base font-bold text-bg transition hover:bg-white/85 active:scale-[0.98] disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex h-10 items-center justify-center gap-2 rounded-full bg-surface-2 px-4 text-sm font-medium text-fg transition hover:bg-line active:scale-[0.98];
+  }
+  .btn-icon {
+    @apply inline-flex size-8 shrink-0 items-center justify-center rounded-full text-dim transition hover:bg-surface-2 hover:text-fg;
+  }
+
+  .btn-pos {
+    @apply bg-pos hover:bg-pos/85;
+  }
+  .btn-neg {
+    @apply bg-neg hover:bg-neg/85;
+  }
+  .switch-neg:checked {
+    @apply bg-neg;
+  }
+
+  /* Control segmentado (Apple) */
+  .seg {
+    @apply grid h-11 grid-cols-2 rounded-xl bg-surface-2 p-1;
+  }
+  .seg label {
+    @apply flex cursor-pointer items-center justify-center rounded-lg text-sm font-bold text-dim transition;
+  }
+  .seg input:checked + span {
+    @apply text-bg;
+  }
+  .seg label:has(input:checked) {
+    @apply bg-fg text-bg;
+  }
+
+  /* Interruptor (Apple) */
+  .switch {
+    @apply relative h-7 w-12 shrink-0 cursor-pointer appearance-none rounded-full bg-line transition;
+  }
+  .switch::after {
+    content: "";
+    @apply absolute left-1 top-1 size-5 rounded-full bg-white transition-transform;
+  }
+  .switch:checked {
+    @apply bg-pos;
+  }
+  .switch:checked::after {
+    @apply translate-x-5;
+  }
+
+  /* Filas de lista agrupada (Apple) */
+  .rows {
+    @apply divide-y divide-line;
+  }
+  .row {
+    @apply flex items-center gap-4 py-4;
+  }
+  .pill {
+    @apply inline-flex items-center rounded-full bg-surface-2 px-2.5 py-0.5 text-xs font-medium text-dim;
+  }
+  .pill-neg {
+    @apply bg-neg/15 text-neg;
+  }
 }
