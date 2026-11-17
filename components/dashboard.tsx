@@ -1,13 +1,14 @@
 "use client";
 
 import { useOptimistic, useTransition } from "react";
-import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, Repeat, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, LogOut, Repeat, X } from "lucide-react";
 import {
   addFixedExpense,
   addIncome as addIncomeAction,
   confirmPossibleExpense,
   deleteFixedExpense,
   deleteIncome,
+  logout,
 } from "@/app/actions";
 import { QuickAddExpense } from "@/components/quick-add-expense";
 import { QuickAddIncome } from "@/components/quick-add-income";
@@ -80,7 +81,15 @@ function nextCharge(day: number, today: Date) {
   return { date: d, days: Math.round((d.getTime() - today.getTime()) / 86400000) };
 }
 
-export function Dashboard({ initial, todayIso }: { initial: State; todayIso: string }) {
+export function Dashboard({
+  initial,
+  todayIso,
+  userName,
+}: {
+  initial: State;
+  todayIso: string;
+  userName: string;
+}) {
   const [state, apply] = useOptimistic(initial, reduce);
   const [, startTransition] = useTransition();
   const { expenses: all, incomes } = state;
@@ -182,8 +191,20 @@ export function Dashboard({ initial, todayIso }: { initial: State; todayIso: str
 
   return (
     <>
+      <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="shrink-0">
+          <p className="eyebrow">Finanzas personales</p>
+          <h1 className="text-2xl font-bold tracking-tight">Hola, {userName}</h1>
+        </div>
+        <form action={logout} className="shrink-0">
+          <button type="submit" className="btn-ghost">
+            <LogOut className="size-4" /> Salir
+          </button>
+        </form>
+      </header>
+
       {/* Resumen */}
-      <section className="card mb-4 grid items-center gap-6 md:grid-cols-2">
+      <section className="card mb-4 grid items-center gap-6 lg:grid-cols-2">
         <div>
           <p className="eyebrow capitalize">Balance de {monthName}</p>
           <p
@@ -209,13 +230,7 @@ export function Dashboard({ initial, todayIso }: { initial: State; todayIso: str
             </p>
           </div>
         </div>
-      </section>
-
-      {/* Añadir rápido */}
-      <div className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.95fr)]">
-        <QuickAddIncome today={iso(today)} onAdd={addIncome} />
-        <QuickAddExpense today={iso(today)} onAdd={addExpense} />
-        <dl className="grid grid-cols-2 content-start gap-3 lg:col-span-2 lg:grid-cols-4 xl:col-span-1 xl:grid-cols-2">
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <Stat
             icon={<ArrowDownLeft className="size-4" />}
             tone="pos"
@@ -249,6 +264,12 @@ export function Dashboard({ initial, todayIso }: { initial: State; todayIso: str
             }
           />
         </dl>
+      </section>
+
+      {/* Añadir rápido */}
+      <div className="mb-4 grid gap-4 lg:grid-cols-2">
+        <QuickAddIncome today={iso(today)} onAdd={addIncome} />
+        <QuickAddExpense today={iso(today)} onAdd={addExpense} />
       </div>
 
       <div className="grid items-start gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -345,7 +366,7 @@ function Stat({
   const iconTone =
     tone === "pos" ? "bg-pos/15 text-pos" : tone === "neg" ? "bg-neg/15 text-neg" : "bg-line text-fg";
   return (
-    <div className="min-w-0 rounded-2xl bg-surface-2 p-3.5">
+    <div className="min-w-0 rounded-2xl bg-surface-2 p-3">
       <div className="mb-2 flex items-center gap-2">
         <span className={`flex size-7 items-center justify-center rounded-full ${iconTone}`}>
           {icon}

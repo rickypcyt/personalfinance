@@ -1,7 +1,5 @@
-import { LogOut } from "lucide-react";
 import { auth } from "@/auth";
 import { sql } from "@/lib/db";
-import { logout } from "../actions";
 import { Dashboard, type Expense, type Income } from "@/components/dashboard";
 
 const iso = (d: Date) =>
@@ -46,21 +44,11 @@ export default async function Home() {
 
   return (
     <div className="w-full px-4 py-6 md:px-8 lg:px-12">
-      <header className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <p className="eyebrow">Finanzas personales</p>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Hola, {session?.user?.name ?? session?.user?.email}
-          </h1>
-        </div>
-        <form action={logout}>
-          <button type="submit" className="btn-ghost">
-            <LogOut className="size-4" /> Salir
-          </button>
-        </form>
-      </header>
-
-      <Dashboard initial={{ expenses, incomes }} todayIso={iso(new Date())} />
+      <Dashboard
+        initial={{ expenses, incomes }}
+        todayIso={iso(new Date())}
+        userName={session?.user?.name ?? session?.user?.email ?? ""}
+      />
     </div>
   );
 }
