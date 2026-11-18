@@ -126,48 +126,69 @@ export async function deleteIncome(formData: FormData) {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export async function updateExpenseDate(id: string, date: string) {
+export async function updateExpense(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!ISO_DATE.test(date)) return { error: "Fecha no válida" };
+
+  const name = (formData.get("name") as string)?.trim();
+  const amount = Number(formData.get("amount"));
+  const date = (formData.get("date") as string) ?? "";
+  const kind = formData.get("kind");
+  if (!name || !(amount > 0) || !ISO_DATE.test(date)) return { error: "Datos no válidos" };
 
   await sql`
     UPDATE fixed_expenses
-    SET spent_on = ${date}, charge_day = ${Number(date.slice(8, 10))}
+    SET name = ${name}, amount = ${amount}, spent_on = ${date}, charge_day = ${Number(date.slice(8, 10))},
+        recurring = ${kind === "recurring"}, status = ${kind === "possible" ? "possible" : "confirmed"}
     WHERE id = ${id} AND user_id = ${session.user.id}
   `;
   revalidatePath("/", "layout");
   return { error: null };
 }
 
-export async function updateIncomeDate(id: string, date: string) {
+export async function updateIncome(id: string, formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
-  if (!ISO_DATE.test(date)) return { error: "Fecha no válida" };
+
+  const description = (formData.get("description") as string)?.trim();
+  const amount = Number(formData.get("amount"));
+  const currency = formData.get("currency") === "USD" ? "USD" : "EUR";
+  const date = (formData.get("date") as string) ?? "";
+  if (!description || !(amount > 0) || !ISO_DATE.test(date)) return { error: "Datos no válidos" };
 
   const rows = await sql`
-    SELECT amount, currency FROM incomes WHERE id = ${id} AND user_id = ${session.user.id}
+    SELECT currency, rate, fee_pct, to_char(received_on, 'YYYY-MM-DD') AS received_on
+    FROM incomes WHERE id = ${id} AND user_id = ${session.user.id}
   `;
   if (rows.length === 0) return { error: "No encontrado" };
+  const prev = rows[0];
 
-  if (rows[0].currency === "USD") {
-    try {
-      const fx = await usdToEur(date);
-      const eurAmount = Math.round(Number(rows[0].amount) * fx.effectiveRate * 100) / 100;
-      await sql`
-        UPDATE incomes
-        SET received_on = ${date}, rate = ${fx.rate}, fee_pct = ${fx.feePct}, amount_eur = ${eurAmount}
-        WHERE id = ${id} AND user_id = ${session.user.id}
-      `;
-    } catch {
-      return { error: "No se pudo obtener el tipo de cambio." };
+  let rate: number | null = null;
+  let feePct: number | null = null;
+  let amountEur = amount;
+  if (currency === "USD") {
+    // Reutiliza el cambio guardado si la fecha no ha cambiado; si no, lo vuelve a pedir.
+    if (prev.currency === "USD" && prev.received_on === date && prev.rate !== null) {
+      rate = Number(prev.rate);
+      feePct = Number(prev.fee_pct ?? 0);
+    } else {
+      try {
+        const fx = await usdToEur(date);
+        rate = fx.rate;
+        feePct = fx.feePct;
+      } catch {
+        return { error: "No se pudo obtener el tipo de cambio." };
+      }
     }
-  } else {
-    await sql`
-      UPDATE incomes SET received_on = ${date}
-      WHERE id = ${id} AND user_id = ${session.user.id}
-    `;
+    amountEur = Math.round(amount * rate * (1 - feePct / 100) * 100) / 100;
   }
+
+  await sql`
+    UPDATE incomes
+    SET description = ${description}, amount = ${amount}, currency = ${currency},
+        rate = ${rate}, fee_pct = ${feePct}, amount_eur = ${amountEur}, received_on = ${date}
+    WHERE id = ${id} AND user_id = ${session.user.id}
+  `;
   revalidatePath("/", "layout");
   return { error: null };
 }

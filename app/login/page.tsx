@@ -13,7 +13,7 @@ export default async function LoginPage({
     <div className="flex min-h-screen items-center justify-center px-5 py-10">
       <main className="w-full max-w-sm">
         <p className="eyebrow mb-2">Finanzas personales</p>
-        <h1 className="mb-6 text-3xl font-bold tracking-tight">Iniciar sesión</h1>
+        <h1 className="mb-6 text-3xl font-semibold tracking-tight">Iniciar sesión</h1>
         {error && (
           <p className="mb-5 rounded-2xl bg-neg/15 px-4 py-3 text-base font-medium text-neg">
             Email o contraseña incorrectos.
@@ -31,9 +31,9 @@ export default async function LoginPage({
           </button>
         </form>
         <div className="mb-6 flex items-center gap-4 text-sm text-dim">
-          <span className="h-px flex-1 bg-line" />
+          <span className="h-px flex-1 bg-line/20" />
           o con email
-          <span className="h-px flex-1 bg-line" />
+          <span className="h-px flex-1 bg-line/20" />
         </div>
         <form action={login} className="flex flex-col gap-4">
           <label className="field">
@@ -48,7 +48,7 @@ export default async function LoginPage({
         </form>
         <p className="mt-6 text-center text-base text-dim">
           ¿No tienes cuenta?{" "}
-          <Link href="/register" className="font-bold text-fg underline underline-offset-4">
+          <Link href="/register" className="font-semibold text-fg underline underline-offset-4">
             Regístrate
           </Link>
         </p>

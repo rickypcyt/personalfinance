@@ -29,7 +29,7 @@ export function QuickAddIncome({
 
   return (
     <section className="card card-pos">
-      <h2 className="mb-0.5 text-xl font-bold tracking-tight text-pos">Nuevo ingreso</h2>
+      <h2 className="mb-0.5 text-xl font-semibold tracking-tight text-pos">Nuevo ingreso</h2>
       <p className="mb-4 text-xs text-dim">Los dólares se pasan a euros con el cambio de Revolut.</p>
       <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
         <label className="field sm:col-span-2">

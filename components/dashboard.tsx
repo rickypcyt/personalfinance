@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useOptimistic, useState, useTransition } from "react";
-import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, LogOut, Repeat, X } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, LogOut, Pencil, Repeat, X } from "lucide-react";
 import {
   addFixedExpense,
   addIncome as addIncomeAction,
@@ -10,10 +10,12 @@ import {
   deleteFixedExpense,
   deleteIncome,
   logout,
+  updateExpense,
+  updateIncome,
 } from "@/app/actions";
 import { QuickAddExpense } from "@/components/quick-add-expense";
 import { QuickAddIncome } from "@/components/quick-add-income";
-import { EditableDate } from "@/components/editable-date";
+import { EditItemDialog, type Editing } from "@/components/edit-item-dialog";
 
 export type Expense = {
   id: string;
@@ -44,7 +46,9 @@ type Op =
   | { type: "addIncome"; item: Income }
   | { type: "removeExpense"; id: string }
   | { type: "removeIncome"; id: string }
-  | { type: "confirm"; id: string; today: string; day: number };
+  | { type: "confirm"; id: string; today: string; day: number }
+  | { type: "updateExpense"; id: string; patch: Partial<Expense> }
+  | { type: "updateIncome"; id: string; patch: Partial<Income> };
 
 function reduce(state: State, op: Op): State {
   switch (op.type) {
@@ -56,6 +60,16 @@ function reduce(state: State, op: Op): State {
       return { ...state, expenses: state.expenses.filter((e) => e.id !== op.id) };
     case "removeIncome":
       return { ...state, incomes: state.incomes.filter((i) => i.id !== op.id) };
+    case "updateExpense":
+      return {
+        ...state,
+        expenses: state.expenses.map((e) => (e.id === op.id ? { ...e, ...op.patch, pending: true } : e)),
+      };
+    case "updateIncome":
+      return {
+        ...state,
+        incomes: state.incomes.map((i) => (i.id === op.id ? { ...i, ...op.patch, pending: true } : i)),
+      };
     case "confirm":
       return {
         ...state,
@@ -71,6 +85,8 @@ function reduce(state: State, op: Op): State {
 const eur = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const fmtDate = (d: Date) => d.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 const fromIso = (s: string) => new Date(s + "T00:00:00");
+const fmtIso = (s: string) =>
+  fromIso(s).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" });
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
@@ -96,6 +112,7 @@ export function Dashboard({
   const [state, apply] = useOptimistic(initial, reduce);
   const [, startTransition] = useTransition();
   const [showLogin, setShowLogin] = useState(false);
+  const [editing, setEditing] = useState<Editing | null>(null);
   const { expenses: all, incomes } = state;
 
   const today = fromIso(todayIso);
@@ -177,6 +194,79 @@ export function Dashboard({
     });
   }
 
+  function openEdit(e: Editing) {
+    if (demo) {
+      setShowLogin(true);
+      return;
+    }
+    setEditing(e);
+  }
+
+  // Se llama dentro de la transición del diálogo, así la actualización optimista se ve al instante.
+  async function saveEdit(data: FormData) {
+    if (!editing) return { error: null };
+    const amount = Number(data.get("amount"));
+    const date = String(data.get("date") ?? todayIso);
+    if (editing.type === "expense") {
+      const kind = data.get("kind");
+      apply({
+        type: "updateExpense",
+        id: editing.item.id,
+        patch: {
+          name: String(data.get("name") ?? "").trim(),
+          amount,
+          recurring: kind === "recurring",
+          possible: kind === "possible",
+          day: Number(date.slice(8, 10)),
+          spentOn: date,
+        },
+      });
+      return updateExpense(editing.item.id, data);
+    }
+    const currency = data.get("currency") === "USD" ? "USD" : "EUR";
+    const rate = editing.item.rate ?? incomes.find((i) => i.currency === "USD" && i.rate)?.rate ?? 0.9;
+    const fee = editing.item.feePct ?? 0.5;
+    apply({
+      type: "updateIncome",
+      id: editing.item.id,
+      patch: {
+        description: String(data.get("description") ?? "").trim(),
+        amount,
+        currency,
+        amountEur: currency === "USD" ? Math.round(amount * rate * (1 - fee / 100) * 100) / 100 : amount,
+        receivedOn: date,
+      },
+    });
+    return updateIncome(editing.item.id, data);
+  }
+
+  // Cambia solo el importe de un gasto, directamente desde la lista.
+  function saveAmount(item: Expense, amount: number) {
+    if (demo) {
+      setShowLogin(true);
+      return;
+    }
+    if (!(amount > 0) || amount === item.amount) return;
+    const date = item.spentOn ?? todayIso;
+    const fd = new FormData();
+    fd.set("name", item.name);
+    fd.set("amount", String(amount));
+    fd.set("date", date);
+    fd.set("kind", item.possible ? "possible" : item.recurring ? "recurring" : "expense");
+    startTransition(async () => {
+      apply({ type: "updateExpense", id: item.id, patch: { amount } });
+      await updateExpense(item.id, fd);
+    });
+  }
+
+  function deleteEditing() {
+    if (!editing) return;
+    const { type, item } = editing;
+    setEditing(null);
+    if (type === "income") removeIncome(item.id);
+    else removeExpense(item.id);
+  }
+
   function confirm(id: string) {
     if (demo) {
       setShowLogin(true);
@@ -218,7 +308,7 @@ export function Dashboard({
       <header className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="shrink-0">
           <p className="eyebrow">Finanzas personales</p>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-2xl font-semibold tracking-tight">
             {demo ? "Controla tu dinero en un vistazo" : `Hola, ${userName}`}
           </h1>
         </div>
@@ -241,8 +331,8 @@ export function Dashboard({
       </header>
 
       {demo && (
-        <p className="mb-4 rounded-2xl border border-line bg-surface px-4 py-3 text-sm text-dim">
-          Esto es una <span className="font-bold text-fg">demo con datos de ejemplo</span>. Inicia
+        <p className="mb-4 glass rounded-[20px] px-4 py-3 text-sm text-dim">
+          Esto es una <span className="font-semibold text-fg">demo con datos de ejemplo</span>. Inicia
           sesión o crea una cuenta para guardar los tuyos.
         </p>
       )}
@@ -252,16 +342,16 @@ export function Dashboard({
         <div>
           <p className="eyebrow capitalize">Balance de {monthName}</p>
           <p
-            className={`mt-1 text-4xl font-bold tracking-tight md:text-5xl ${
+            className={`mt-1 text-4xl font-semibold tracking-tight md:text-5xl ${
               balance < 0 ? "text-neg" : ""
             }`}
           >
             {eur.format(balance)}
           </p>
           <div className="mt-4">
-            <div className="h-2 overflow-hidden rounded-full bg-surface-2">
+            <div className="h-1.5 overflow-hidden rounded-full bg-surface-3/50">
               <div
-                className={`h-full rounded-full ${spentPct >= 100 ? "bg-neg" : "bg-fg"}`}
+                className={`h-full rounded-full ${spentPct >= 100 ? "bg-neg" : "bg-accent"}`}
                 style={{ width: `${spentPct}%` }}
               />
             </div>
@@ -321,18 +411,20 @@ export function Dashboard({
       <Group title="Ingresos" total={`+${eur.format(incomes.reduce((s, i) => s + i.amountEur, 0))}`} empty="Aún no hay ingresos." count={incomes.length}>
         {incomes.map((i) => (
           <article key={i.id} className={`item ${i.pending ? "opacity-60" : ""}`}>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-bold">{i.description}</p>
-              <div className="flex flex-wrap items-center gap-x-2">
-                <EditableDate locked={demo} onLocked={() => setShowLogin(true)} id={i.id} value={i.receivedOn} kind="income" />
-                {i.currency === "USD" && i.rate !== null && (
-                  <span className="text-xs text-dim">
-                    ${i.amount.toFixed(2)} · {i.rate.toFixed(3)} · fee {i.feePct}%
-                  </span>
-                )}
-              </div>
-            </div>
-            <span className="text-lg font-bold text-pos">+{eur.format(i.amountEur)}</span>
+            <ItemBody
+              title={i.description}
+              onEdit={() => openEdit({ type: "income", item: i })}
+              meta={
+                <>
+                  {fmtIso(i.receivedOn)}
+                  {i.currency === "USD" && i.rate !== null && (
+                    <> · ${i.amount.toFixed(2)} · {i.rate.toFixed(3)} · fee {i.feePct}%</>
+                  )}
+                </>
+              }
+            />
+            <span className="text-lg font-semibold text-pos">+{eur.format(i.amountEur)}</span>
+            <EditButton onClick={() => openEdit({ type: "income", item: i })} />
             <DeleteButton onClick={() => removeIncome(i.id)} />
           </article>
         ))}
@@ -342,16 +434,17 @@ export function Dashboard({
       <Group title="Recurrentes" total={eur.format(recurringTotal)} empty="Activa “Se repite cada mes” al añadir un gasto." count={recurring.length}>
         {recurring.map((i) => (
           <article key={i.id} className={`item ${i.pending ? "opacity-60" : ""}`}>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-bold">{i.name}</p>
-              <div className="flex flex-wrap items-center gap-x-2">
-                <EditableDate locked={demo} onLocked={() => setShowLogin(true)} id={i.id} value={i.spentOn ?? iso(i.next.date)} kind="expense" />
-                <span className={i.next.days <= 3 ? "text-xs font-medium text-neg" : "text-xs text-dim"}>
+            <ItemBody
+              title={i.name}
+              onEdit={() => openEdit({ type: "expense", item: i, fallbackDate: iso(i.next.date) })}
+              meta={
+                <span className={i.next.days <= 3 ? "font-medium text-neg" : ""}>
                   Día {i.day} · {i.next.days === 0 ? "hoy" : `en ${i.next.days} d`}
                 </span>
-              </div>
-            </div>
-            <span className="text-lg font-bold">{eur.format(i.amount)}</span>
+              }
+            />
+            <InlineAmount value={i.amount} onSave={(n) => saveAmount(i, n)} />
+            <EditButton onClick={() => openEdit({ type: "expense", item: i, fallbackDate: iso(i.next.date) })} />
             <DeleteButton onClick={() => removeExpense(i.id)} />
           </article>
         ))}
@@ -361,11 +454,13 @@ export function Dashboard({
       <Group title="Puntuales" total={eur.format(oneOff.reduce((s, i) => s + i.amount, 0))} empty="Aún no hay gastos puntuales." count={oneOff.length}>
         {oneOff.map((i) => (
           <article key={i.id} className={`item ${i.pending ? "opacity-60" : ""}`}>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-bold">{i.name}</p>
-              <EditableDate locked={demo} onLocked={() => setShowLogin(true)} id={i.id} value={i.spentOn ?? iso(today)} kind="expense" />
-            </div>
-            <span className="text-lg font-bold">{eur.format(i.amount)}</span>
+            <ItemBody
+              title={i.name}
+              onEdit={() => openEdit({ type: "expense", item: i, fallbackDate: iso(today) })}
+              meta={fmtIso(i.spentOn ?? iso(today))}
+            />
+            <InlineAmount value={i.amount} onSave={(n) => saveAmount(i, n)} />
+            <EditButton onClick={() => openEdit({ type: "expense", item: i, fallbackDate: iso(today) })} />
             <DeleteButton onClick={() => removeExpense(i.id)} />
           </article>
         ))}
@@ -375,11 +470,12 @@ export function Dashboard({
       <Group title="Posibles" total={eur.format(possibles.reduce((s, i) => s + i.amount, 0))} empty="Guarda aquí lo que quieres comprar y aún no." count={possibles.length}>
         {possibles.map((i) => (
           <article key={i.id} className={`item ${i.pending ? "opacity-60" : ""}`}>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-base font-bold">{i.name}</p>
-              <p className="text-xs text-dim">Pendiente de decidir</p>
-            </div>
-            <span className="text-lg font-bold">{eur.format(i.amount)}</span>
+            <ItemBody
+              title={i.name}
+              onEdit={() => openEdit({ type: "expense", item: i, fallbackDate: iso(today) })}
+              meta="Pendiente de decidir"
+            />
+            <InlineAmount value={i.amount} onSave={(n) => saveAmount(i, n)} />
             <button type="button" onClick={() => confirm(i.id)} className="btn-icon hover:!bg-pos/15 hover:!text-pos" aria-label="Confirmar compra" title="Confirmar: ya lo compré">
               <Check className="size-4" />
             </button>
@@ -390,9 +486,18 @@ export function Dashboard({
         ))}
       </Group>
       </div>
+      {editing && (
+        <EditItemDialog
+          key={editing.item.id}
+          editing={editing}
+          onClose={() => setEditing(null)}
+          onSave={saveEdit}
+          onDelete={deleteEditing}
+        />
+      )}
       {showLogin && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-md"
           onClick={() => setShowLogin(false)}
         >
           <div
@@ -401,7 +506,7 @@ export function Dashboard({
             className="card w-full max-w-sm"
             onClick={(e) => e.stopPropagation()}
           >
-            <h2 className="text-2xl font-bold tracking-tight">Inicia sesión para continuar</h2>
+            <h2 className="text-2xl font-semibold tracking-tight">Inicia sesión para continuar</h2>
             <p className="mt-2 text-sm text-dim">
               Necesitas una cuenta para añadir, editar o borrar movimientos. Es gratis y tarda un
               minuto.
@@ -438,18 +543,86 @@ function Stat({
   tone?: "pos" | "neg";
 }) {
   const iconTone =
-    tone === "pos" ? "bg-pos/15 text-pos" : tone === "neg" ? "bg-neg/15 text-neg" : "bg-line text-fg";
+    tone === "pos" ? "bg-pos/15 text-pos" : tone === "neg" ? "bg-neg/15 text-neg" : "bg-surface-3/60 text-fg";
   return (
-    <div className="min-w-0 rounded-2xl bg-surface-2 p-3">
+    <div className="min-w-0 rounded-[18px] border border-line/15 bg-surface-2/40 p-3.5">
       <div className="mb-2 flex items-center gap-2">
         <span className={`flex size-7 items-center justify-center rounded-full ${iconTone}`}>
           {icon}
         </span>
         <dt className="text-xs font-medium text-dim">{label}</dt>
       </div>
-      <dd className="truncate text-lg font-bold">{value}</dd>
+      <dd className="truncate text-lg font-semibold">{value}</dd>
       {hint && <p className="truncate text-xs text-dim">{hint}</p>}
     </div>
+  );
+}
+
+function ItemBody({
+  title,
+  meta,
+  onEdit,
+}: {
+  title: string;
+  meta: React.ReactNode;
+  onEdit: () => void;
+}) {
+  return (
+    <button type="button" onClick={onEdit} className="min-w-0 flex-1 cursor-pointer text-left">
+      <p className="truncate text-base font-semibold">{title}</p>
+      <p className="truncate text-xs text-dim">{meta}</p>
+    </button>
+  );
+}
+
+function InlineAmount({ value, onSave }: { value: number; onSave: (n: number) => void }) {
+  const [editing, setEditing] = useState(false);
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        title="Cambiar importe"
+        className="-mx-1.5 cursor-text rounded-[10px] px-1.5 text-lg font-semibold transition hover:bg-surface-3/50"
+      >
+        {eur.format(value)}
+      </button>
+    );
+  }
+
+  function commit(input: HTMLInputElement) {
+    setEditing(false);
+    const n = Math.round(Number(input.value.replace(",", ".")) * 100) / 100;
+    if (n > 0 && n !== value) onSave(n);
+  }
+
+  return (
+    <span className="flex items-center gap-1 text-lg font-semibold">
+      <input
+        type="text"
+        inputMode="decimal"
+        autoFocus
+        defaultValue={String(value).replace(".", ",")}
+        onFocus={(e) => e.currentTarget.select()}
+        onBlur={(e) => commit(e.currentTarget)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          if (e.key === "Escape") setEditing(false);
+        }}
+        aria-label="Nuevo importe en euros"
+        className="w-24 rounded-[10px] border border-accent/70 bg-surface-2/60 px-2 py-0.5 text-right outline-none"
+      />
+      €
+    </span>
+  );
+}
+
+function EditButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button type="button" onClick={onClick} className="btn-icon" aria-label="Editar" title="Editar">
+      <Pencil className="size-3.5" />
+    </button>
   );
 }
 
@@ -477,7 +650,7 @@ function Group({
   return (
     <section className="card flex flex-col">
       <div className="mb-4 flex items-baseline justify-between gap-4">
-        <h2 className="text-xl font-bold tracking-tight">{title}</h2>
+        <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
         <span className="text-base font-medium text-dim">{total}</span>
       </div>
       {count === 0 ? (

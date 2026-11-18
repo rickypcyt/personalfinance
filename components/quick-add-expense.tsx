@@ -41,7 +41,7 @@ export function QuickAddExpense({
 
   return (
     <section className="card card-neg">
-      <h2 className="mb-4 text-xl font-bold tracking-tight text-neg">Nuevo gasto</h2>
+      <h2 className="mb-4 text-xl font-semibold tracking-tight text-neg">Nuevo gasto</h2>
       <form ref={formRef} onSubmit={onSubmit} className="grid gap-3 sm:grid-cols-2">
         <div className="seg grid-cols-3 sm:col-span-2">
           {OPTIONS.map((o) => (
@@ -82,7 +82,7 @@ export function QuickAddExpense({
           Fecha
           <input name="date" type="date" defaultValue={today} required className="input" />
         </label>
-        <p className="rounded-xl bg-surface-2 px-3.5 py-2.5 text-xs text-dim sm:col-span-2">
+        <p className="rounded-[14px] bg-surface-2/40 px-3.5 py-2.5 text-xs text-dim sm:col-span-2">
           {HINTS[kind]}
         </p>
         <button type="submit" disabled={pending} className="btn btn-neg sm:col-span-2">

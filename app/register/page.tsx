@@ -18,7 +18,7 @@ export default async function RegisterPage({
     <div className="flex min-h-screen items-center justify-center px-5 py-10">
       <main className="w-full max-w-sm">
         <p className="eyebrow mb-2">Finanzas personales</p>
-        <h1 className="mb-6 text-3xl font-bold tracking-tight">Crear cuenta</h1>
+        <h1 className="mb-6 text-3xl font-semibold tracking-tight">Crear cuenta</h1>
         {error && (
           <p className="mb-5 rounded-2xl bg-neg/15 px-4 py-3 text-base font-medium text-neg">
             {errors[error] ?? "Ha ocurrido un error."}
@@ -36,9 +36,9 @@ export default async function RegisterPage({
           </button>
         </form>
         <div className="mb-6 flex items-center gap-4 text-sm text-dim">
-          <span className="h-px flex-1 bg-line" />
+          <span className="h-px flex-1 bg-line/20" />
           o con email
-          <span className="h-px flex-1 bg-line" />
+          <span className="h-px flex-1 bg-line/20" />
         </div>
         <form action={register} className="flex flex-col gap-4">
           <label className="field">
@@ -57,7 +57,7 @@ export default async function RegisterPage({
         </form>
         <p className="mt-6 text-center text-base text-dim">
           ¿Ya tienes cuenta?{" "}
-          <Link href="/login" className="font-bold text-fg underline underline-offset-4">
+          <Link href="/login" className="font-semibold text-fg underline underline-offset-4">
             Inicia sesión
           </Link>
         </p>
