@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { usdToEur } from "@/lib/fx";
+import { ensureVaultTables } from "@/lib/vaults";
 
 export async function register(formData: FormData) {
   const name = formData.get("name") as string;
@@ -105,10 +106,27 @@ export async function addIncome(formData: FormData) {
     }
   }
 
-  await sql`
+  // Destino: cuenta principal (vacío) o un vault del usuario.
+  const vaultId = ((formData.get("vaultId") as string) ?? "").trim();
+  if (vaultId) {
+    await ensureVaultTables();
+    const owned = await sql`SELECT 1 FROM vaults WHERE id = ${vaultId} AND user_id = ${session.user.id}`;
+    if (owned.length === 0) return { error: "Vault no encontrado" };
+  }
+
+  const inserted = await sql`
     INSERT INTO incomes (user_id, description, amount, currency, rate, fee_pct, amount_eur, received_on)
     VALUES (${session.user.id}, ${description}, ${amount}, ${currency}, ${rate}, ${feePct}, ${amountEur}, ${date})
+    RETURNING id
   `;
+  // El ingreso cuenta como ingreso, pero queda apartado en el vault (no suma al balance disponible).
+  if (vaultId) {
+    await sql`
+      INSERT INTO vault_movements (user_id, vault_id, amount, note, moved_on, income_id)
+      VALUES (${session.user.id}, ${vaultId}, ${amountEur}, ${description.slice(0, 80)}, ${date},
+        ${String(inserted[0].id)})
+    `;
+  }
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -117,9 +135,12 @@ export async function deleteIncome(formData: FormData) {
   const session = await auth();
   if (!session?.user?.id) redirect("/login");
 
+  const id = formData.get("id") as string;
+  await ensureVaultTables();
+  await sql`DELETE FROM vault_movements WHERE income_id = ${id} AND user_id = ${session.user.id}`;
   await sql`
     DELETE FROM incomes
-    WHERE id = ${formData.get("id") as string} AND user_id = ${session.user.id}
+    WHERE id = ${id} AND user_id = ${session.user.id}
   `;
   revalidatePath("/", "layout");
 }
@@ -189,6 +210,13 @@ export async function updateIncome(id: string, formData: FormData) {
         rate = ${rate}, fee_pct = ${feePct}, amount_eur = ${amountEur}, received_on = ${date}
     WHERE id = ${id} AND user_id = ${session.user.id}
   `;
+  // Mantiene sincronizado el movimiento del vault si el ingreso fue directo a uno.
+  await ensureVaultTables();
+  await sql`
+    UPDATE vault_movements
+    SET amount = ${amountEur}, note = ${description.slice(0, 80)}, moved_on = ${date}
+    WHERE income_id = ${id} AND user_id = ${session.user.id}
+  `;
   revalidatePath("/", "layout");
   return { error: null };
 }
@@ -203,6 +231,86 @@ export async function confirmPossibleExpense(formData: FormData) {
     UPDATE fixed_expenses
     SET status = 'confirmed', recurring = false, spent_on = ${today}, charge_day = ${now.getDate()}
     WHERE id = ${formData.get("id") as string} AND user_id = ${session.user.id} AND status = 'possible'
+  `;
+  revalidatePath("/", "layout");
+}
+
+// ---------- Vaults (ahorros) ----------
+
+export async function createVault(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const name = (formData.get("name") as string)?.trim();
+  const goalRaw = ((formData.get("goal") as string) ?? "").trim();
+  const goal = goalRaw ? Number(goalRaw) : null;
+  if (!name || name.length > 40) return { error: "Ponle un nombre al vault" };
+  if (goal !== null && !(goal > 0)) return { error: "La meta debe ser mayor que 0" };
+
+  await ensureVaultTables();
+  await sql`
+    INSERT INTO vaults (user_id, name, goal) VALUES (${session.user.id}, ${name}, ${goal})
+  `;
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+export async function deleteVault(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await ensureVaultTables();
+  await sql`
+    DELETE FROM vaults WHERE id = ${formData.get("id") as string} AND user_id = ${session.user.id}
+  `;
+  revalidatePath("/", "layout");
+}
+
+export async function moveVaultMoney(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  const vaultId = formData.get("vaultId") as string;
+  const amount = Math.round(Number(formData.get("amount")) * 100) / 100;
+  const direction = formData.get("direction") === "out" ? "out" : "in";
+  const note = ((formData.get("note") as string) ?? "").trim().slice(0, 80);
+  const date = (formData.get("date") as string) ?? "";
+  if (!(amount > 0) || !ISO_DATE.test(date)) return { error: "Datos no válidos" };
+
+  await ensureVaultTables();
+  const rows = await sql`
+    SELECT v.id, COALESCE(SUM(m.amount), 0) AS balance
+    FROM vaults v LEFT JOIN vault_movements m ON m.vault_id = v.id
+    WHERE v.id = ${vaultId} AND v.user_id = ${session.user.id}
+    GROUP BY v.id
+  `;
+  if (rows.length === 0) return { error: "Vault no encontrado" };
+  if (direction === "out" && amount > Number(rows[0].balance)) {
+    return { error: "No hay tanto dinero en este vault" };
+  }
+
+  await sql`
+    INSERT INTO vault_movements (user_id, vault_id, amount, note, moved_on)
+    VALUES (${session.user.id}, ${vaultId}, ${direction === "out" ? -amount : amount},
+      ${note || null}, ${date})
+  `;
+  revalidatePath("/", "layout");
+  return { error: null };
+}
+
+export async function deleteVaultMovement(formData: FormData) {
+  const session = await auth();
+  if (!session?.user?.id) redirect("/login");
+
+  await ensureVaultTables();
+  // No permite borrar un ingreso si dejaría el vault en negativo.
+  await sql`
+    DELETE FROM vault_movements m
+    WHERE m.id = ${formData.get("id") as string} AND m.user_id = ${session.user.id}
+      AND (
+        m.amount < 0 OR
+        (SELECT COALESCE(SUM(x.amount), 0) FROM vault_movements x WHERE x.vault_id = m.vault_id) - m.amount >= 0
+      )
   `;
   revalidatePath("/", "layout");
 }

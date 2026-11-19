@@ -1,12 +1,18 @@
 import { auth } from "@/auth";
 import { sql } from "@/lib/db";
-import { Dashboard, type Expense, type Income } from "@/components/dashboard";
+import { Dashboard, type Expense, type Income, type Vault, type VaultMove } from "@/components/dashboard";
+import { ensureVaultTables } from "@/lib/vaults";
 
 const iso = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 // Datos de ejemplo para quien aún no ha iniciado sesión.
-function demoData(todayIso: string): { expenses: Expense[]; incomes: Income[] } {
+function demoData(todayIso: string): {
+  expenses: Expense[];
+  incomes: Income[];
+  vaults: Vault[];
+  vaultMoves: VaultMove[];
+} {
   const month = todayIso.slice(0, 7);
   const today = Number(todayIso.slice(8, 10));
   const day = (back: number) => `${month}-${String(Math.max(1, today - back)).padStart(2, "0")}`;
@@ -26,7 +32,15 @@ function demoData(todayIso: string): { expenses: Expense[]; incomes: Income[] } 
     { id: "i1", description: "Nómina", amount: 1850, currency: "EUR", rate: null, feePct: null, amountEur: 1850, receivedOn: `${month}-01` },
     { id: "i2", description: "Freelance", amount: 220, currency: "USD", rate: 0.91, feePct: 0.5, amountEur: 199.2, receivedOn: day(2) },
   ];
-  return { expenses, incomes };
+  const vaults: Vault[] = [
+    { id: "v1", name: "Viaje", goal: 1500, balance: 420 },
+    { id: "v2", name: "Fondo de emergencia", goal: 3000, balance: 1250 },
+  ];
+  const vaultMoves: VaultMove[] = [
+    { id: "m1", vaultId: "v1", amount: 100, note: "Ahorro del mes", movedOn: day(4) },
+    { id: "m2", vaultId: "v2", amount: 250, note: "", movedOn: day(9) },
+  ];
+  return { expenses, incomes, vaults, vaultMoves };
 }
 
 export default async function Home() {
@@ -42,7 +56,8 @@ export default async function Home() {
   }
 
   const userId = session.user.id;
-  const [expenseRows, incomeRows] = await Promise.all([
+  await ensureVaultTables();
+  const [expenseRows, incomeRows, vaultRows, vaultMoveRows] = await Promise.all([
     sql`
       SELECT id, name, amount, charge_day, recurring, status, to_char(spent_on, 'YYYY-MM-DD') AS spent_on
       FROM fixed_expenses WHERE user_id = ${userId}
@@ -52,6 +67,17 @@ export default async function Home() {
              to_char(received_on, 'YYYY-MM-DD') AS received_on
       FROM incomes WHERE user_id = ${userId}
       ORDER BY received_on DESC, created_at DESC
+    `,
+    sql`
+      SELECT v.id, v.name, v.goal, COALESCE(SUM(m.amount), 0) AS balance
+      FROM vaults v LEFT JOIN vault_movements m ON m.vault_id = v.id
+      WHERE v.user_id = ${userId}
+      GROUP BY v.id ORDER BY v.created_at
+    `,
+    sql`
+      SELECT id, vault_id, amount, note, income_id, to_char(moved_on, 'YYYY-MM-DD') AS moved_on
+      FROM vault_movements WHERE user_id = ${userId}
+      ORDER BY moved_on DESC, created_at DESC LIMIT 200
     `,
   ]);
 
@@ -75,10 +101,25 @@ export default async function Home() {
     receivedOn: r.received_on as string,
   }));
 
+  const vaults: Vault[] = vaultRows.map((r) => ({
+    id: r.id as string,
+    name: r.name as string,
+    goal: r.goal === null ? null : Number(r.goal),
+    balance: Number(r.balance),
+  }));
+  const vaultMoves: VaultMove[] = vaultMoveRows.map((r) => ({
+    id: r.id as string,
+    vaultId: r.vault_id as string,
+    amount: Number(r.amount),
+    note: (r.note as string | null) ?? "",
+    movedOn: r.moved_on as string,
+    incomeId: (r.income_id as string | null) ?? null,
+  }));
+
   return (
     <div className="w-full px-4 py-6 md:px-8 lg:px-12">
       <Dashboard
-        initial={{ expenses, incomes }}
+        initial={{ expenses, incomes, vaults, vaultMoves }}
         todayIso={todayIso}
         userName={session.user.name ?? session.user.email ?? ""}
       />
