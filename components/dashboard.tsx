@@ -963,14 +963,14 @@ function weekLabel(start: string, thisWeek: string) {
 
 function groupByWeek(moves: Move[]) {
   const weeks = new Map<string, Move[]>();
-  for (const m of [...moves].sort((a, b) => b.date.localeCompare(a.date))) {
+  for (const m of [...moves].sort((a, b) => a.date.localeCompare(b.date))) {
     const k = weekStart(m.date);
     const list = weeks.get(k);
     if (list) list.push(m);
     else weeks.set(k, [m]);
   }
   return [...weeks.entries()]
-    .sort((a, b) => b[0].localeCompare(a[0]))
+    .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([start, list]) => ({
       start,
       list,
@@ -1068,7 +1068,12 @@ function HistoryCard({
         </p>
       ) : (
         <div className="mt-5 flex flex-col divide-y divide-line/15">
-          {weeks.slice(0, shown).map((w) => (
+          {weeks.length > shown && (
+            <button type="button" onClick={() => setShown((s) => s + WEEKS_PAGE)} className="btn-ghost mb-5 w-full">
+              Mostrar semanas anteriores
+            </button>
+          )}
+          {weeks.slice(-shown).map((w) => (
             <div key={w.start} className="py-5 first:pt-0 last:pb-0">
               <div className="mb-1 flex items-baseline justify-between gap-4">
                 <h3 className="text-sm font-semibold">
@@ -1108,11 +1113,6 @@ function HistoryCard({
         </div>
       )}
 
-      {weeks.length > shown && (
-        <button type="button" onClick={() => setShown((s) => s + WEEKS_PAGE)} className="btn-ghost mt-5 w-full">
-          Mostrar semanas anteriores
-        </button>
-      )}
     </section>
   );
 }
