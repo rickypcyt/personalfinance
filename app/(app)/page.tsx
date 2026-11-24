@@ -59,14 +59,15 @@ export default async function Home() {
   await ensureVaultTables();
   const [expenseRows, incomeRows, vaultRows, vaultMoveRows] = await Promise.all([
     sql`
-      SELECT id, name, amount, charge_day, recurring, status, to_char(spent_on, 'YYYY-MM-DD') AS spent_on
+      SELECT id, name, amount, charge_day, recurring, status, to_char(spent_on, 'YYYY-MM-DD') AS spent_on, created_at
       FROM fixed_expenses WHERE user_id = ${userId}
+      ORDER BY created_at, id
     `,
     sql`
       SELECT id, description, amount, currency, rate, fee_pct, amount_eur,
-             to_char(received_on, 'YYYY-MM-DD') AS received_on
+             to_char(received_on, 'YYYY-MM-DD') AS received_on, created_at
       FROM incomes WHERE user_id = ${userId}
-      ORDER BY received_on DESC, created_at DESC
+      ORDER BY created_at, id
     `,
     sql`
       SELECT v.id, v.name, v.goal, COALESCE(SUM(m.amount), 0) AS balance
@@ -89,6 +90,7 @@ export default async function Home() {
     possible: r.status === "possible",
     day: r.charge_day as number,
     spentOn: r.spent_on as string | null,
+    createdAt: new Date(r.created_at as string | Date).toISOString(),
   }));
   const incomes: Income[] = incomeRows.map((r) => ({
     id: r.id as string,
@@ -99,6 +101,7 @@ export default async function Home() {
     feePct: r.fee_pct === null ? null : Number(r.fee_pct),
     amountEur: Number(r.amount_eur),
     receivedOn: r.received_on as string,
+    createdAt: new Date(r.created_at as string | Date).toISOString(),
   }));
 
   const vaults: Vault[] = vaultRows.map((r) => ({

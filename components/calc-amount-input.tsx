@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 /** Evalúa sumas/restas/multiplicaciones/divisiones simples: "4+4+12-3", "10*2,5". */
 export function evalExpression(raw: string): number | null {
-  const s = raw.replace(/\s+/g, "").replace(/,/g, ".");
+  const s = raw.replace(/\s+/g, "").replace(/,/g, ".").replace(/[xX×]/g, "*").replace(/÷/g, "/");
   if (!s || !/^[0-9+\-*/().]+$/.test(s)) return null;
   let i = 0;
   const peek = () => s[i];
@@ -63,7 +63,7 @@ export function CalcAmountInput({ name = "amount", className, initial = "" }: { 
     return () => form.removeEventListener("reset", onReset);
   }, []);
   const value = evalExpression(text);
-  const isExpr = /[+\-*/()]/.test(text.replace(/^\s*-/, ""));
+  const isExpr = /[+\-*/()xX×÷]/.test(text.replace(/^\s*-/, ""));
   const valid = value !== null && value > 0;
 
   return (
@@ -105,7 +105,7 @@ export function CalcAmountInput({ name = "amount", className, initial = "" }: { 
 export function CalcHint() {
   return (
     <p className="text-xs text-dim">
-      💡 Puedes calcular en el importe: prueba <span className="font-medium">4+4+12-3</span>
+      💡 Puedes calcular en el importe: prueba <span className="font-medium">4+4+12-3</span> o <span className="font-medium">3x3</span>
     </p>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { ArrowDownLeft, ArrowUpRight, CalendarClock, Check, LogOut, PiggyBank, Repeat, X } from "lucide-react";
 import {
   addFixedExpense,
@@ -31,6 +31,7 @@ export type Expense = {
   possible: boolean;
   day: number;
   spentOn: string | null;
+  createdAt?: string;
   pending?: boolean;
 };
 
@@ -43,6 +44,7 @@ export type Income = {
   feePct: number | null;
   amountEur: number;
   receivedOn: string;
+  createdAt?: string;
   pending?: boolean;
 };
 
@@ -203,6 +205,7 @@ export function Dashboard({
         possible: kind === "possible",
         day: Number(date.slice(8, 10)),
         spentOn: date,
+        createdAt: new Date().toISOString(),
         pending: true,
       },
     });
@@ -223,7 +226,7 @@ export function Dashboard({
     const receivedOn = String(data.get("date") ?? todayIso);
     apply({
       type: "addIncome",
-      item: { id, description, amount, currency, rate: null, feePct: null, amountEur, receivedOn, pending: true },
+      item: { id, description, amount, currency, rate: null, feePct: null, amountEur, receivedOn, createdAt: new Date().toISOString(), pending: true },
     });
     const vaultId = String(data.get("vaultId") ?? "");
     if (vaultId) {
@@ -488,55 +491,37 @@ export function Dashboard({
 
       {/* Resumen del mes + sesión en la esquina superior derecha */}
       <div className="sticky top-3 z-30 flex flex-col-reverse gap-4 sm:flex-row sm:items-start">
-      <section className="card grid min-w-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-center">
-        <div className="min-w-0">
-          <p className="eyebrow capitalize">Balance de {monthName}</p>
+      <section className="card relative flex min-w-0 flex-1 !bg-surface !backdrop-blur-none items-center gap-x-6 gap-y-2 overflow-hidden !rounded-full !px-6 !py-2.5 max-sm:flex-wrap max-sm:!rounded-[24px]">
+        <div className="min-w-0 shrink-0">
+          <p className="eyebrow capitalize leading-none">{monthName}</p>
           <p
-            className={`mt-1 truncate text-5xl font-semibold tracking-tight ${balance < 0 ? "text-neg" : ""}`}
+            className={`truncate text-2xl font-semibold leading-tight tracking-tight ${balance < 0 ? "text-neg" : ""}`}
+            title={spentPct !== null ? `Has gastado el ${spentPct} % de tus ingresos` : undefined}
           >
             {eur.format(balance)}
           </p>
-          {spentPct !== null ? (
-            <div className="mt-4 max-w-sm">
-              <div className="h-1.5 overflow-hidden rounded-full bg-surface-3/50">
-                <div
-                  className={`h-full rounded-full ${spentPct > 100 ? "bg-neg" : "bg-accent"}`}
-                  style={{ width: `${Math.min(100, spentPct)}%` }}
-                />
-              </div>
-              <p className="mt-1.5 text-xs text-dim">Has gastado el {spentPct} % de tus ingresos</p>
-            </div>
-          ) : (
-            <p className="mt-2 text-xs text-dim">
-              {expensesMonth > 0 ? "Sin ingresos este mes" : "Sin movimientos este mes"}
-            </p>
-          )}
         </div>
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Stat
-            icon={<ArrowDownLeft className="size-3.5" />}
+        <div className="ml-auto grid min-w-0 grid-cols-3 divide-x divide-line/15 text-right max-sm:w-full">
+          <MiniStat
+            icon={<ArrowDownLeft className="size-3" />}
             label="Ingresos"
             value={`+${eur.format(incomeMonth)}`}
             tone="text-pos"
-            sub="este mes"
+            title="Ingresos de este mes"
           />
-          <Stat
-            icon={<ArrowUpRight className="size-3.5" />}
+          <MiniStat
+            icon={<ArrowUpRight className="size-3" />}
             label="Gastos"
             value={`−${eur.format(expensesMonth)}`}
             tone="text-neg"
-            sub={`${eur.format(recurringTotal)} fijos · ${eur.format(oneOffMonth)} puntuales`}
+            title={`${eur.format(recurringTotal)} fijos · ${eur.format(oneOffMonth)} puntuales`}
           />
-          <Stat
-            icon={<PiggyBank className="size-3.5" />}
+          <MiniStat
+            icon={<PiggyBank className="size-3" />}
             label="Vaults"
             value={eur.format(vaultsTotal)}
             tone="text-accent"
-            sub={
-              vaultNetMonth !== 0
-                ? `${vaultNetMonth > 0 ? "+" : "−"}${eur.format(Math.abs(vaultNetMonth))} este mes`
-                : `${vaults.length} ${vaults.length === 1 ? "vault" : "vaults"}`
-            }
+            title={`${vaults.length} ${vaults.length === 1 ? "vault" : "vaults"}`}
           />
         </div>
       </section>
@@ -577,8 +562,9 @@ export function Dashboard({
             <QuickAddExpense today={iso(today)} kind={expenseKind} onKindChange={setExpenseKind} onAdd={addExpense} />
           </div>
         </section>
+        <div className="relative md:col-span-2 2xl:col-span-1 2xl:self-stretch">
         <HistoryCard
-          className="md:col-span-2 2xl:col-span-1 2xl:self-stretch"
+          className="2xl:absolute 2xl:inset-0"
           incomes={incomes}
           oneOff={oneOff}
           todayIso={todayIso}
@@ -589,6 +575,7 @@ export function Dashboard({
           onIncomeAmount={saveIncomeAmount}
           onExpenseAmount={saveAmount}
         />
+        </div>
       </div>
 
       {/* Recurrentes | Posibles | Vaults */}
@@ -640,7 +627,7 @@ export function Dashboard({
           <div
             role="dialog"
             aria-modal="true"
-            className="card w-full max-w-sm"
+            className="card w-full max-w-sm !bg-surface !backdrop-blur-none"
             onClick={(e) => e.stopPropagation()}
           >
             <h2 className="text-2xl font-semibold tracking-tight">Inicia sesión para continuar</h2>
@@ -672,26 +659,25 @@ export function Dashboard({
 
 /* ---------- Piezas de layout ---------- */
 
-function Stat({
+function MiniStat({
   icon,
   label,
   value,
-  sub,
   tone,
+  title,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
-  sub: string;
   tone: string;
+  title: string;
 }) {
   return (
-    <div className="min-w-0 rounded-[20px] border border-line/15 bg-surface-2/30 p-4">
-      <p className="eyebrow flex items-center gap-1.5">
+    <div className="min-w-0 px-4 last:pr-0 max-sm:px-2" title={title}>
+      <p className="eyebrow flex items-center justify-end gap-1 leading-none">
         {icon} {label}
       </p>
-      <p className={`mt-1 truncate text-2xl font-semibold tracking-tight ${tone}`}>{value}</p>
-      <p className="mt-0.5 truncate text-xs text-dim">{sub}</p>
+      <p className={`truncate text-base font-semibold leading-tight tracking-tight ${tone}`}>{value}</p>
     </div>
   );
 }
@@ -757,7 +743,7 @@ function RecurringCard({
       {recurring.length === 0 ? (
         <p className="mt-3 text-sm text-dim">Elige “Recurrente” al añadir un gasto.</p>
       ) : (
-        <div className="-mx-2 mt-3 flex flex-col">
+        <div className="no-scrollbar -mx-2 mt-3 flex max-h-72 flex-col overflow-y-auto overscroll-contain">
           {recurring.map((i) => (
             <article key={i.id} className={`${ROW} ${i.pending ? "opacity-60" : ""}`}>
               <ItemBody
@@ -811,7 +797,7 @@ function PossiblesCard({
       {possibles.length === 0 ? (
         <p className="mt-3 text-sm text-dim">Guarda aquí lo que quieres comprar y aún no compras.</p>
       ) : (
-        <div className="-mx-2 mt-3 flex flex-col">
+        <div className="no-scrollbar -mx-2 mt-3 flex max-h-72 flex-col overflow-y-auto overscroll-contain">
           {possibles.map((i) => (
             <article key={i.id} className={`${ROW} ${i.pending ? "opacity-60" : ""}`}>
               <ItemBody title={i.name} onEdit={() => onEdit(i)} meta="Pendiente de decidir" />
@@ -935,6 +921,7 @@ type Move = {
   kind: "income" | "expense";
   title: string;
   date: string;
+  created: string;
   amount: number;
   pending?: boolean;
   extra?: string;
@@ -963,14 +950,14 @@ function weekLabel(start: string, thisWeek: string) {
 
 function groupByWeek(moves: Move[]) {
   const weeks = new Map<string, Move[]>();
-  for (const m of [...moves].sort((a, b) => a.date.localeCompare(b.date))) {
+  for (const m of [...moves].sort((a, b) => (b.created || "￿").localeCompare(a.created || "￿"))) {
     const k = weekStart(m.date);
     const list = weeks.get(k);
     if (list) list.push(m);
     else weeks.set(k, [m]);
   }
   return [...weeks.entries()]
-    .sort((a, b) => a[0].localeCompare(b[0]))
+    .sort((a, b) => b[0].localeCompare(a[0]))
     .map(([start, list]) => ({
       start,
       list,
@@ -1012,6 +999,11 @@ function HistoryCard({
 }) {
   const [tab, setTab] = useState<Tab>("all");
   const [shown, setShown] = useState(WEEKS_PAGE);
+  const listRef = useRef<HTMLDivElement>(null);
+  // Lo más reciente va arriba: al cambiar de pestaña, volver al principio.
+  useEffect(() => {
+    listRef.current?.scrollTo({ top: 0 });
+  }, [tab]);
 
   const moves: Move[] = [
     ...incomes.map<Move>((i) => ({
@@ -1019,6 +1011,7 @@ function HistoryCard({
       kind: "income",
       title: i.description,
       date: i.receivedOn,
+      created: i.createdAt ?? "",
       amount: i.amountEur,
       pending: i.pending,
       extra: i.currency === "USD" ? `$${i.amount.toFixed(2)}` : undefined,
@@ -1029,6 +1022,7 @@ function HistoryCard({
       kind: "expense",
       title: e.name,
       date: e.spentOn ?? todayIso,
+      created: e.createdAt ?? "",
       amount: e.amount,
       pending: e.pending,
       expense: e,
@@ -1038,8 +1032,8 @@ function HistoryCard({
   const thisWeek = weekStart(todayIso);
 
   return (
-    <section className={`card ${className}`}>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className={`card flex max-h-[40rem] min-h-0 flex-col 2xl:max-h-none ${className}`}>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold tracking-tight">Historial</h2>
         <div className="seg w-full grid-cols-3 sm:w-72">
           {TABS.map((t) => (
@@ -1067,13 +1061,11 @@ function HistoryCard({
               : "Aún no hay movimientos."}
         </p>
       ) : (
-        <div className="mt-5 flex flex-col divide-y divide-line/15">
-          {weeks.length > shown && (
-            <button type="button" onClick={() => setShown((s) => s + WEEKS_PAGE)} className="btn-ghost mb-5 w-full">
-              Mostrar semanas anteriores
-            </button>
-          )}
-          {weeks.slice(-shown).map((w) => (
+        <div
+          ref={listRef}
+          className="mt-5 flex min-h-0 flex-1 flex-col divide-y divide-line/15 no-scrollbar overflow-y-auto overscroll-contain"
+        >
+          {weeks.slice(0, shown).map((w) => (
             <div key={w.start} className="py-5 first:pt-0 last:pb-0">
               <div className="mb-1 flex items-baseline justify-between gap-4">
                 <h3 className="text-sm font-semibold">
@@ -1110,6 +1102,11 @@ function HistoryCard({
               </div>
             </div>
           ))}
+          {weeks.length > shown && (
+            <button type="button" onClick={() => setShown((s) => s + WEEKS_PAGE)} className="btn-ghost mt-5 w-full shrink-0">
+              Mostrar semanas anteriores
+            </button>
+          )}
         </div>
       )}
 

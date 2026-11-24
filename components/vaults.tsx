@@ -59,7 +59,7 @@ export function VaultsSection({
 
       <div className="mt-4 flex flex-1 flex-col gap-5">
         {vaults.length > 0 && (
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
+          <div className="no-scrollbar grid max-h-96 gap-5 overflow-y-auto overscroll-contain sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-1">
             {vaults.map((v) => (
               <VaultTile key={v.id} vault={v} onMove={onMove} onDelete={() => onDeleteVault(v.id)} />
             ))}
@@ -75,11 +75,11 @@ export function VaultsSection({
           />
 
           {moves.length === 0 ? (
-            <p className="py-8 text-center text-sm text-dim">
+            <p className="py-4 text-center text-sm text-dim">
               Aquí verás cada vez que destines o retires dinero.
             </p>
           ) : (
-            <div className="-mx-2 mt-3 flex flex-col">
+            <div className="no-scrollbar -mx-2 mt-3 flex max-h-64 flex-col overflow-y-auto overscroll-contain">
               {moves.slice(0, shown).map((m) => {
               const vault = byId.get(m.vaultId);
               const deposit = m.amount > 0;
@@ -180,15 +180,20 @@ function VaultTile({
   }
 
   return (
-    <div className={`card flex flex-col gap-2.5 !p-4 ${vault.pending ? "opacity-60" : ""}`}>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="truncate text-sm font-semibold text-dim">{vault.name}</h3>
+    <div
+      className={`flex flex-col gap-2 rounded-[18px] border border-line/15 bg-surface-2/40 p-3 ${
+        vault.pending ? "opacity-60" : ""
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        <h3 className="min-w-0 flex-1 truncate text-sm font-semibold">{vault.name}</h3>
+        <p className="shrink-0 text-base font-semibold tracking-tight">{eur.format(vault.balance)}</p>
         <button
           type="button"
           onClick={() => {
             if (window.confirm(`¿Eliminar el vault “${vault.name}” y todos sus movimientos?`)) onDelete();
           }}
-          className="btn-icon -mr-1.5 !size-6"
+          className="btn-icon -mr-1 !size-6"
           aria-label="Eliminar vault"
           title="Eliminar vault"
         >
@@ -196,14 +201,11 @@ function VaultTile({
         </button>
       </div>
 
-      <div className="flex items-baseline justify-between gap-2">
-        <p className="truncate text-2xl font-semibold tracking-tight">{eur.format(vault.balance)}</p>
-        <p className="shrink-0 text-xs text-dim">
-          {vault.goal ? `${Math.round(pct)} % de ${eur.format(vault.goal)}` : "Sin meta"}
-        </p>
-      </div>
       {vault.goal ? (
-        <div className="h-1 overflow-hidden rounded-full bg-surface-3/50">
+        <div
+          className="h-1 overflow-hidden rounded-full bg-surface-3/50"
+          title={`${Math.round(pct)} % de ${eur.format(vault.goal)}`}
+        >
           <div className="h-full rounded-full bg-accent" style={{ width: `${pct}%` }} />
         </div>
       ) : null}
@@ -215,13 +217,13 @@ function VaultTile({
           inputMode="decimal"
           placeholder="Importe €"
           aria-label={`Importe para ${vault.name}`}
-          className="input !h-9 min-w-0 flex-1"
+          className="input !h-8 min-w-0 flex-1 !text-sm"
         />
         <button
           type="button"
           disabled={pending}
           onClick={() => submit("in")}
-          className="btn !h-9 !px-3 !text-sm"
+          className="btn !h-8 !px-3 !text-sm"
           title="Destinar al vault"
         >
           <Plus className="size-4" /> Destinar
@@ -230,7 +232,7 @@ function VaultTile({
           type="button"
           disabled={pending || vault.balance <= 0}
           onClick={() => submit("out")}
-          className="btn-icon !size-9 bg-surface-2/60"
+          className="btn-icon !size-8 bg-surface-2/60"
           aria-label="Retirar"
           title="Retirar del vault"
         >
@@ -275,7 +277,7 @@ function NewVaultDialog({
       aria-modal="true"
       aria-label="Nuevo vault"
       onClick={(e) => e.stopPropagation()}
-      className="card flex w-full max-w-sm flex-col gap-2"
+      className="card flex w-full max-w-sm flex-col gap-2 !bg-surface !backdrop-blur-none"
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="text-lg font-semibold tracking-tight">Nuevo vault</h3>

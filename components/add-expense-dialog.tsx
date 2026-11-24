@@ -44,7 +44,7 @@ export function AddExpenseDialog({
         aria-modal="true"
         aria-label={recurring ? "Nuevo recurrente" : "Nuevo posible"}
         onClick={(e) => e.stopPropagation()}
-        className="card flex w-full max-w-sm flex-col gap-3"
+        className="card flex w-full max-w-sm flex-col gap-3 !bg-surface !backdrop-blur-none"
       >
         <div className="flex items-center justify-between gap-4">
           <h2 className="text-xl font-semibold tracking-tight">

@@ -62,7 +62,7 @@ export function EditItemDialog({
         role="dialog"
         aria-modal="true"
         aria-label={isIncome ? "Editar ingreso" : "Editar gasto"}
-        className="card w-full max-w-md"
+        className="card w-full max-w-md !bg-surface !backdrop-blur-none"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between gap-4">

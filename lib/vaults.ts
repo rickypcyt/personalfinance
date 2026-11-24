@@ -28,6 +28,9 @@ export function ensureVaultTables() {
     `;
     // Si el movimiento nace de un ingreso enviado directamente al vault, guarda su id.
     await sql`ALTER TABLE vault_movements ADD COLUMN IF NOT EXISTS income_id text`;
+    // Orden de alta (con hora) de gastos e ingresos.
+    await sql`ALTER TABLE fixed_expenses ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
+    await sql`ALTER TABLE incomes ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now()`;
     await sql`CREATE INDEX IF NOT EXISTS vaults_user_idx ON vaults (user_id)`;
     await sql`CREATE INDEX IF NOT EXISTS vault_movements_vault_idx ON vault_movements (vault_id)`;
   })().catch((e) => {

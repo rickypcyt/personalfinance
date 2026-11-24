@@ -13,9 +13,9 @@ export const KIND_OPTIONS: { value: Kind; label: string }[] = [
 ];
 
 const HINTS: Record<Kind, string> = {
-  expense: "Un gasto que ya hiciste: corte de pelo, helado, ropa…",
-  recurring: "Se cobra cada mes el día de la fecha elegida: suscripciones, alquiler…",
-  possible: "No cuenta en tus gastos hasta que lo confirmes en “Posibles”.",
+  expense: "Nuevo gasto",
+  recurring: "Nuevo gasto recurrente",
+  possible: "Nuevo gasto posible",
 };
 
 export function KindSelector({ kind, onChange }: { kind: Kind; onChange: (k: Kind) => void }) {
