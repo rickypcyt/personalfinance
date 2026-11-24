@@ -1,5 +1,6 @@
 "use client";
 
+import { CalcAmountInput, CalcHint } from "@/components/calc-amount-input";
 import { useState, useTransition } from "react";
 import { Plus, X } from "lucide-react";
 
@@ -71,7 +72,7 @@ export function AddExpenseDialog({
         <div className="grid grid-cols-2 gap-3">
           <label className="field">
             Importe (€)
-            <input name="amount" type="number" step="0.01" min="0.01" required placeholder="0,00" className="input" />
+            <CalcAmountInput className="input" />
           </label>
           <label className="field">
             Fecha

@@ -487,7 +487,7 @@ export function Dashboard({
       )}
 
       {/* Resumen del mes + sesión en la esquina superior derecha */}
-      <div className="flex flex-col-reverse gap-4 sm:flex-row sm:items-start">
+      <div className="sticky top-3 z-30 flex flex-col-reverse gap-4 sm:flex-row sm:items-start">
       <section className="card grid min-w-0 flex-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)] lg:items-center">
         <div className="min-w-0">
           <p className="eyebrow capitalize">Balance de {monthName}</p>

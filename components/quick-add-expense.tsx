@@ -1,5 +1,6 @@
 "use client";
 
+import { CalcAmountInput, CalcHint } from "@/components/calc-amount-input";
 import { useRef, useTransition } from "react";
 import { Plus } from "lucide-react";
 
@@ -59,7 +60,7 @@ export function QuickAddExpense({
       await onAdd(data);
       formRef.current?.reset();
       onKindChange("expense");
-      formRef.current?.querySelector<HTMLInputElement>("[name=amount]")?.focus();
+      formRef.current?.querySelector<HTMLInputElement>("[aria-label=Importe]")?.focus();
     });
   }
 
@@ -79,17 +80,11 @@ export function QuickAddExpense({
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-3xl font-semibold text-dim">€</span>
-            <input
-              name="amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              placeholder="0,00"
-              className="w-full bg-transparent text-4xl font-semibold tracking-tight text-fg outline-none placeholder:text-dim/40"
-            />
+            <CalcAmountInput className="w-full bg-transparent text-4xl font-semibold tracking-tight text-fg outline-none placeholder:text-dim/40" />
           </div>
         </div>
+
+        <CalcHint />
 
         <label className="field">
           Qué es

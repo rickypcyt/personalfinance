@@ -1,5 +1,6 @@
 "use client";
 
+import { CalcAmountInput, CalcHint } from "@/components/calc-amount-input";
 import { useState, useTransition } from "react";
 import { Trash2, X } from "lucide-react";
 import type { Expense, Income } from "@/components/dashboard";
@@ -104,15 +105,7 @@ export function EditItemDialog({
 
           <label className="field">
             {isIncome ? "Importe" : "Importe (€)"}
-            <input
-              name="amount"
-              type="number"
-              step="0.01"
-              min="0.01"
-              required
-              defaultValue={item.amount}
-              className="input"
-            />
+            <CalcAmountInput className="input" initial={String(item.amount)} />
           </label>
 
           {editing.type === "income" ? (
